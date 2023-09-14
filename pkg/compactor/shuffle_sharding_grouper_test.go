@@ -747,6 +747,11 @@ type RingMock struct {
 	mock.Mock
 }
 
+func (r *RingMock) GetExcluding(key uint32, op ring.Operation, bufDescs []ring.InstanceDesc, bufHosts []string, bufZones map[string]int, excludeInstances []string) (ring.ReplicationSet, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (r *RingMock) Collect(ch chan<- prometheus.Metric) {}
 
 func (r *RingMock) Describe(ch chan<- *prometheus.Desc) {}

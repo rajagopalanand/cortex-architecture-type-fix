@@ -71,6 +71,16 @@ const (
 	recordingRuleFilter string = "record"
 )
 
+type RuleGroupInfo interface {
+	GetName() string
+	GetNamespace() string
+	GetUser() string
+}
+
+type AntiAffinityRuleGroupConfig struct {
+	RuleGroups []RuleGroupInfo
+}
+
 type DisabledRuleGroupErr struct {
 	Message string
 }
@@ -132,8 +142,9 @@ type Config struct {
 
 	RingCheckPeriod time.Duration `yaml:"-"`
 
-	EnableQueryStats      bool `yaml:"query_stats_enabled"`
-	DisableRuleGroupLabel bool `yaml:"disable_rule_group_label"`
+	EnableQueryStats            bool                        `yaml:"query_stats_enabled"`
+	DisableRuleGroupLabel       bool                        `yaml:"disable_rule_group_label"`
+	AntiAffinityRuleGroupConfig AntiAffinityRuleGroupConfig `yaml:"-" doc:"nocli"`
 }
 
 // Validate config and returns error on failure
@@ -434,13 +445,30 @@ func tokenForGroup(g *rulespb.RuleGroupDesc) uint32 {
 	return ringHasher.Sum32()
 }
 
-func instanceOwnsRuleGroup(r ring.ReadRing, g *rulespb.RuleGroupDesc, disabledRuleGroups validation.DisabledRuleGroups, instanceAddr string) (bool, error) {
+func instanceOwnsRuleGroup(r ring.ReadRing, g *rulespb.RuleGroupDesc, disabledRuleGroups validation.DisabledRuleGroups, instanceAddr string, rulerFinder *AntiAffinityRulerPicker) (bool, error) {
 
 	hash := tokenForGroup(g)
 
-	rlrs, err := r.Get(hash, RingOp, nil, nil, nil)
-	if err != nil {
-		return false, errors.Wrap(err, "error reading ring to verify rule group ownership")
+	var rlrs ring.ReplicationSet
+
+	if rulerFinder != nil {
+		replicas := rulerFinder.Get(hash)
+		if len(replicas.Instances) > 0 {
+			fmt.Println("instance owns rg ", replicas.Instances)
+			rlrs = replicas
+		} else {
+			rulers, err := r.Get(hash, RingOp, nil, nil, nil)
+			if err != nil {
+				return false, errors.Wrap(err, "error reading ring to verify rule group ownership")
+			}
+			rlrs = rulers
+		}
+	} else {
+		rulers, err := r.Get(hash, RingOp, nil, nil, nil)
+		if err != nil {
+			return false, errors.Wrap(err, "error reading ring to verify rule group ownership")
+		}
+		rlrs = rulers
 	}
 
 	ownsRuleGroup := rlrs.Instances[0].Addr == instanceAddr
@@ -488,6 +516,7 @@ func (r *Ruler) run(ctx context.Context) error {
 	}
 
 	r.syncRules(ctx, rulerSyncReasonInitial)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -588,7 +617,7 @@ func (r *Ruler) listRulesShardingDefault(ctx context.Context) (map[string]rulesp
 
 	filteredConfigs := make(map[string]rulespb.RuleGroupList)
 	for userID, groups := range configs {
-		filtered := filterRuleGroups(userID, groups, r.limits.DisabledRuleGroups(userID), r.ring, r.lifecycler.GetInstanceAddr(), r.logger, r.ringCheckErrors)
+		filtered := filterRuleGroups(userID, groups, r.limits.DisabledRuleGroups(userID), r.ring, nil, r.lifecycler.GetInstanceAddr(), r.logger, r.ringCheckErrors)
 		if len(filtered) > 0 {
 			filteredConfigs[userID] = filtered
 		}
@@ -623,6 +652,8 @@ func (r *Ruler) listRulesShuffleSharding(ctx context.Context) (map[string]rulesp
 		return nil, nil
 	}
 
+	rulerFinder := NewAntiAffinityRulerPicker(r.cfg.AntiAffinityRuleGroupConfig, userRings)
+
 	userCh := make(chan string, len(userRings))
 	for u := range userRings {
 		userCh <- u
@@ -646,7 +677,7 @@ func (r *Ruler) listRulesShuffleSharding(ctx context.Context) (map[string]rulesp
 					return errors.Wrapf(err, "failed to fetch rule groups for user %s", userID)
 				}
 
-				filtered := filterRuleGroups(userID, groups, r.limits.DisabledRuleGroups(userID), userRings[userID], r.lifecycler.GetInstanceAddr(), r.logger, r.ringCheckErrors)
+				filtered := filterRuleGroups(userID, groups, r.limits.DisabledRuleGroups(userID), userRings[userID], rulerFinder, r.lifecycler.GetInstanceAddr(), r.logger, r.ringCheckErrors)
 				if len(filtered) == 0 {
 					continue
 				}
@@ -668,11 +699,11 @@ func (r *Ruler) listRulesShuffleSharding(ctx context.Context) (map[string]rulesp
 //
 // Reason why this function is not a method on Ruler is to make sure we don't accidentally use r.ring,
 // but only ring passed as parameter.
-func filterRuleGroups(userID string, ruleGroups []*rulespb.RuleGroupDesc, disabledRuleGroups validation.DisabledRuleGroups, ring ring.ReadRing, instanceAddr string, log log.Logger, ringCheckErrors prometheus.Counter) []*rulespb.RuleGroupDesc {
+func filterRuleGroups(userID string, ruleGroups []*rulespb.RuleGroupDesc, disabledRuleGroups validation.DisabledRuleGroups, ring ring.ReadRing, rulerFinder *AntiAffinityRulerPicker, instanceAddr string, log log.Logger, ringCheckErrors prometheus.Counter) []*rulespb.RuleGroupDesc {
 	// Prune the rule group to only contain rules that this ruler is responsible for, based on ring.
 	var result []*rulespb.RuleGroupDesc
 	for _, g := range ruleGroups {
-		owned, err := instanceOwnsRuleGroup(ring, g, disabledRuleGroups, instanceAddr)
+		owned, err := instanceOwnsRuleGroup(ring, g, disabledRuleGroups, instanceAddr, rulerFinder)
 		if err != nil {
 			switch e := err.(type) {
 			case *DisabledRuleGroupErr:

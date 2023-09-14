@@ -3,6 +3,7 @@ package ruler
 import (
 	"flag"
 	"fmt"
+	"github.com/cortexproject/cortex/pkg/ruler/rulespb"
 	"os"
 	"time"
 
@@ -105,4 +106,69 @@ func (cfg *RingConfig) ToRingConfig() ring.Config {
 	rc.ReplicationFactor = 1
 
 	return rc
+}
+
+type AntiAffinityRulerPicker struct {
+	antiAffinityCfg AntiAffinityRuleGroupConfig
+	keyRings        map[string]ring.ReadRing
+	result          map[uint32]ring.InstanceDesc
+}
+
+func NewAntiAffinityRulerPicker(antiAffinityCfg AntiAffinityRuleGroupConfig, userRings map[string]ring.ReadRing) *AntiAffinityRulerPicker {
+	res := &AntiAffinityRulerPicker{
+		antiAffinityCfg: antiAffinityCfg,
+		keyRings:        userRings,
+	}
+	res.calc(0, map[string]bool{})
+	return res
+}
+
+func (a *AntiAffinityRulerPicker) calc(index int, taken map[string]bool) bool {
+	if index == len(a.antiAffinityCfg.RuleGroups) {
+		return true
+	}
+	ruleGroup := a.antiAffinityCfg.RuleGroups[index]
+	ring := a.keyRings[ruleGroup.GetUser()]
+	token := tokenForGroup(&rulespb.RuleGroupDesc{
+		Name:      ruleGroup.GetName(),
+		Namespace: ruleGroup.GetNamespace(),
+		User:      ruleGroup.GetUser(),
+	})
+	excludedInstances := []string{}
+	for k, _ := range taken {
+		excludedInstances = append(excludedInstances, k)
+	}
+
+	for {
+		replicas, err := ring.GetExcluding(token, RingOp, nil, nil, nil, excludedInstances)
+		if err != nil {
+			//handle error
+			return false
+		}
+		if len(replicas.Instances) == 0 {
+			break
+		}
+		ruler := replicas.Instances[0]
+		excludedInstances = append(excludedInstances, ruler.Addr)
+		if taken[ruler.Addr] {
+			continue
+		}
+		a.result[token] = ruler
+		taken[ruler.Addr] = true
+		if a.calc(index+1, taken) {
+			return true
+		}
+		delete(a.result, token)
+		delete(taken, ruler.Addr)
+	}
+	return false
+}
+
+func (a *AntiAffinityRulerPicker) Get(key uint32) ring.ReplicationSet {
+	if _, OK := a.result[key]; !OK {
+		return ring.ReplicationSet{}
+	}
+	return ring.ReplicationSet{
+		Instances: []ring.InstanceDesc{a.result[key]},
+	}
 }

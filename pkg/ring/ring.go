@@ -39,6 +39,7 @@ const (
 
 // ReadRing represents the read interface to the ring.
 type ReadRing interface {
+	GetExcluding(key uint32, op Operation, bufDescs []InstanceDesc, bufHosts []string, bufZones map[string]int, excludeInstances []string) (ReplicationSet, error)
 
 	// Get returns n (or more) instances which form the replicas for the given key.
 	// bufDescs, bufHosts and bufZones are slices to be overwritten for the return value
@@ -349,6 +350,96 @@ func (r *Ring) updateRingState(ringDesc *Desc) {
 		r.shuffledSubringCache = make(map[subringCacheKey]*Ring)
 	}
 	r.updateRingMetrics(rc)
+}
+
+func (r *Ring) GetExcluding(key uint32, op Operation, bufDescs []InstanceDesc, bufHosts []string, bufZones map[string]int, excludeInstances []string) (ReplicationSet, error) {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+	if r.ringDesc == nil || len(r.ringTokens) == 0 {
+		return ReplicationSet{}, ErrEmptyRing
+	}
+
+	var (
+		replicationFactor      = r.cfg.ReplicationFactor
+		instances              = bufDescs[:0]
+		start                  = searchToken(r.ringTokens, key)
+		iterations             = 0
+		maxInstancePerZone     = replicationFactor / len(r.ringZones)
+		zonesWithExtraInstance = replicationFactor % len(r.ringZones)
+
+		// We use a slice instead of a map because it's faster to search within a
+		// slice than lookup a map for a very low number of items.
+		distinctHosts       = bufHosts[:0]
+		numOfInstanceByZone = resetZoneMap(bufZones)
+	)
+
+	for i := start; len(distinctHosts) < replicationFactor && iterations < len(r.ringTokens); i++ {
+		iterations++
+		// Wrap i around in the ring.
+		i %= len(r.ringTokens)
+		token := r.ringTokens[i]
+
+		info, ok := r.ringInstanceByToken[token]
+		if !ok {
+			// This should never happen unless a bug in the ring code.
+			return ReplicationSet{}, ErrInconsistentTokensInfo
+		}
+
+		// We want n *distinct* instances.
+		if util.StringsContain(distinctHosts, info.InstanceID) {
+			continue
+		}
+		instance := r.ringDesc.Ingesters[info.InstanceID]
+
+		if util.StringsContain(excludeInstances, instance.Addr) {
+			continue
+		}
+
+		// Ignore if the instances don't have a zone set.
+		if r.cfg.ZoneAwarenessEnabled && info.Zone != "" {
+			maxNumOfInstance := maxInstancePerZone
+			// If we still have room for zones with extra instance, increase the instance threshold by 1
+			if zonesWithExtraInstance > 0 {
+				maxNumOfInstance++
+			}
+
+			if numOfInstanceByZone[info.Zone] >= maxNumOfInstance {
+				continue
+			}
+		}
+
+		distinctHosts = append(distinctHosts, info.InstanceID)
+
+		// Check whether the replica set should be extended given we're including
+		// this instance.
+		if op.ShouldExtendReplicaSetOnState(instance.State) {
+			replicationFactor++
+		} else if r.cfg.ZoneAwarenessEnabled && info.Zone != "" {
+			// We should only add the zone if we are not going to extend,
+			// as we want to extend the instance in the same AZ.
+			if numOfInstance, ok := numOfInstanceByZone[info.Zone]; !ok {
+				numOfInstanceByZone[info.Zone] = 1
+			} else if numOfInstance < maxInstancePerZone {
+				numOfInstanceByZone[info.Zone]++
+			} else {
+				// This zone will have an extra instance
+				numOfInstanceByZone[info.Zone]++
+				zonesWithExtraInstance--
+			}
+		}
+
+		instances = append(instances, instance)
+	}
+
+	healthyInstances, maxFailure, err := r.strategy.Filter(instances, op, r.cfg.ReplicationFactor, r.cfg.HeartbeatTimeout, r.cfg.ZoneAwarenessEnabled, r.KVClient.LastUpdateTime(r.key))
+	if err != nil {
+		return ReplicationSet{}, err
+	}
+
+	return ReplicationSet{
+		Instances: healthyInstances,
+		MaxErrors: maxFailure,
+	}, nil
 }
 
 // Get returns n (or more) instances which form the replicas for the given key.
