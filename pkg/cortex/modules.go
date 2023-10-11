@@ -558,6 +558,7 @@ func (t *Cortex) initRuler() (serv services.Service, err error) {
 	t.Cfg.Ruler.Ring.ListenPort = t.Cfg.Server.GRPCListenPort
 
 	if t.Cfg.ExternalPusher != nil && t.Cfg.ExternalQueryable != nil {
+		level.Info(util_log.Logger).Log("Initializing --->>> query engine inside t.Cfg.ExternalPusher")
 		rulerRegisterer := prometheus.WrapRegistererWith(prometheus.Labels{"engine": "ruler"}, prometheus.DefaultRegisterer)
 
 		var queryEngine v1.QueryEngine
@@ -587,6 +588,7 @@ func (t *Cortex) initRuler() (serv services.Service, err error) {
 		managerFactory := ruler.DefaultTenantManagerFactory(t.Cfg.Ruler, t.Cfg.ExternalPusher, t.Cfg.ExternalQueryable, queryEngine, t.Overrides, prometheus.DefaultRegisterer)
 		manager, err = ruler.NewDefaultMultiTenantManager(t.Cfg.Ruler, managerFactory, prometheus.DefaultRegisterer, util_log.Logger)
 	} else {
+		level.Info(util_log.Logger).Log("Initializing --->>> query engine in else part of t.Cfg.ExternalPusher")
 		rulerRegisterer := prometheus.WrapRegistererWith(prometheus.Labels{"engine": "ruler"}, prometheus.DefaultRegisterer)
 		// TODO: Consider wrapping logger to differentiate from querier module logger
 		queryable, _, engine := querier.New(t.Cfg.Querier, t.Overrides, t.Distributor, t.StoreQueryables, t.TombstonesLoader, rulerRegisterer, util_log.Logger)

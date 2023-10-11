@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -468,6 +469,47 @@ func (r *Ruler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				</body>
 			</html>`
 		util.WriteHTMLResponse(w, unshardedPage)
+	}
+}
+
+func parseBrokenJSON(brokenJSON []byte) (string, bool) {
+	queries := strings.ReplaceAll(string(brokenJSON), "\x00", "")
+	if len(queries) > 0 {
+		queries = queries[:len(queries)-1] + "]"
+	}
+
+	// Conditional because of implementation detail: len() = 1 implies file consisted of a single char: '['.
+	if len(queries) <= 1 {
+		return "[]", false
+	}
+
+	return queries, true
+}
+
+func (r *Ruler) LogQueries(w http.ResponseWriter, req *http.Request) {
+	localStoragePath := "./active-query-tracker"
+	filename, filesize := filepath.Join(localStoragePath, "queries.active"), 1+8*1000
+
+	if _, err := os.Stat(filename); err == nil {
+		fd, err := os.Open(filename)
+		if err != nil {
+			level.Error(r.logger).Log("msg", "Failed to open query log file", "err", err)
+			return
+		}
+		//defer fd.Close()
+
+		brokenJSON := make([]byte, filesize)
+		_, err = fd.Read(brokenJSON)
+		if err != nil {
+			level.Error(r.logger).Log("msg", "Failed to read query log file", "err", err)
+			return
+		}
+
+		queries, queriesExist := parseBrokenJSON(brokenJSON)
+		if !queriesExist {
+			return
+		}
+		level.Info(r.logger).Log("msg", "These queries didn't finish in prometheus' last run:", "queries", queries)
 	}
 }
 
