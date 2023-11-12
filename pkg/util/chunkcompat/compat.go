@@ -21,8 +21,12 @@ func SeriesChunksToMatrix(from, through model.Time, serieses []client.TimeSeries
 
 	result := model.Matrix{}
 	for _, series := range serieses {
-		metric := cortexpb.FromLabelAdaptersToMetric(series.Labels)
-		chunks, err := FromChunks(cortexpb.FromLabelAdaptersToLabels(series.Labels), series.Chunks)
+		labels := cortexpb.FromLabelPairsToLabels(series.Labels)
+		metric := cortexpb.FromLabelPairsToMetric(labels)
+		//metric := series.Labels
+		//chunks, err := FromChunks(cortexpb.FromLabelAdaptersToLabels(series.Labels), series.Chunks)
+		chunks, err := FromChunks(labels, series.Chunks)
+
 		if err != nil {
 			return nil, err
 		}

@@ -10,7 +10,7 @@ VERSION=$(shell cat "./VERSION" 2> /dev/null)
 GOPROXY_VALUE=$(shell go env GOPROXY)
 
 # ARCHS
-ARCHS       = amd64 arm64
+ARCHS       = amd64 #arm64
 
 # Boiler plate for building Docker containers.
 # All this must go at top of file I'm afraid.
@@ -175,7 +175,7 @@ protos: $(PROTO_GOS)
 %.pb.go:
 	@# The store-gateway RPC is based on Thanos which uses relative references to other protos, so we need
 	@# to configure all such relative paths.
-	protoc -I $(GOPATH)/src:./vendor/github.com/thanos-io/thanos/pkg:./vendor/github.com/gogo/protobuf:./vendor:./$(@D) --gogoslick_out=plugins=grpc,Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types,:./$(@D) ./$(patsubst %.pb.go,%.proto,$@)
+	protoc -I /Users/anrajag/go/src:./vendor/github.com/thanos-io/thanos/pkg:./vendor/github.com/gogo/protobuf:./vendor:./$(@D) --gogoslick_out=plugins=grpc,Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types,:./$(@D) ./$(patsubst %.pb.go,%.proto,$@)
 
 lint:
 	misspell -error docs

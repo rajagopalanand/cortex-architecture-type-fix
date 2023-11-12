@@ -51,6 +51,19 @@ func FromLabelAdaptersToLabels(ls []LabelAdapter) labels.Labels {
 	return *(*labels.Labels)(unsafe.Pointer(&ls))
 }
 
+func FromLabelPairsToLabels(ls []LabelPair) labels.Labels {
+	result := make(labels.Labels, len(ls))
+	for i, lp := range ls {
+		result[i].Name = string(lp.Name)
+		result[i].Value = string(lp.Value)
+	}
+	return result
+}
+
+func FromLabelPairsToMetric(labels labels.Labels) model.Metric {
+	return util.LabelsToMetric(labels)
+}
+
 // FromLabelAdaptersToLabelsWithCopy converts []LabelAdapter to labels.Labels.
 // Do NOT use unsafe to convert between data types because this function may
 // get in input labels whose data structure is reused.
