@@ -3,12 +3,11 @@ package cortexpb
 import (
 	"flag"
 	"fmt"
+	"github.com/prometheus/prometheus/model/labels"
 	"io"
 	"strings"
 	"sync"
 	"unsafe"
-
-	"github.com/prometheus/prometheus/model/labels"
 )
 
 var (
@@ -209,7 +208,8 @@ func (bs *LabelAdapter) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			bs.Name = yoloString(dAtA[iNdEx:postIndex])
+			//bs.Name = yoloString(dAtA[iNdEx:postIndex])
+			bs.Name = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -240,7 +240,8 @@ func (bs *LabelAdapter) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			bs.Value = yoloString(dAtA[iNdEx:postIndex])
+			//bs.Value = yoloString(dAtA[iNdEx:postIndex])
+			bs.Value = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
