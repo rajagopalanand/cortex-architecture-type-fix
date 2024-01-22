@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"flag"
+	"github.com/cortexproject/cortex/pkg/rulerqueryscheduler"
 	"net/http"
 	"path"
 	"strings"
@@ -304,6 +305,10 @@ func (a *API) RegisterIngester(i Ingester, pushConfig distributor.Config) {
 func (a *API) RegisterTenantDeletion(api *purger.TenantDeletionAPI) {
 	a.RegisterRoute("/purger/delete_tenant", http.HandlerFunc(api.DeleteTenant), true, "POST")
 	a.RegisterRoute("/purger/delete_tenant_status", http.HandlerFunc(api.DeleteTenantStatus), true, "GET")
+}
+
+func (a *API) RegisterRulerScheduler(r *rulerqueryscheduler.RulerScheduler) {
+	rulerqueryscheduler.RegisterRulerSchedulerServer(a.server.GRPC, r)
 }
 
 // RegisterRuler registers routes associated with the Ruler service.

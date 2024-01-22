@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/cortexproject/cortex/pkg/rulerqueryscheduler"
 	"net/http"
 	"os"
 	"reflect"
@@ -114,6 +115,7 @@ type Config struct {
 	TenantFederation tenantfederation.Config         `yaml:"tenant_federation"`
 
 	Ruler               ruler.Config                               `yaml:"ruler"`
+	RulerQueryScheduler rulerqueryscheduler.Config                 `yaml:"ruler_query_scheduler"`
 	RulerStorage        rulestore.Config                           `yaml:"ruler_storage"`
 	Configs             configs.Config                             `yaml:"configs"`
 	Alertmanager        alertmanager.MultitenantAlertmanagerConfig `yaml:"alertmanager"`
@@ -160,6 +162,7 @@ func (c *Config) RegisterFlags(f *flag.FlagSet) {
 	c.TenantFederation.RegisterFlags(f)
 
 	c.Ruler.RegisterFlags(f)
+	c.RulerQueryScheduler.RegisterFlags(f)
 	c.RulerStorage.RegisterFlags(f)
 	c.Configs.RegisterFlags(f)
 	c.Alertmanager.RegisterFlags(f)
@@ -306,14 +309,15 @@ type Cortex struct {
 	QuerierEngine            v1.QueryEngine
 	QueryFrontendTripperware tripperware.Tripperware
 
-	Ruler        *ruler.Ruler
-	RulerStorage rulestore.RuleStore
-	ConfigAPI    *configAPI.API
-	ConfigDB     db.DB
-	Alertmanager *alertmanager.MultitenantAlertmanager
-	Compactor    *compactor.Compactor
-	StoreGateway *storegateway.StoreGateway
-	MemberlistKV *memberlist.KVInitService
+	Ruler          *ruler.Ruler
+	RulerScheduler *rulerqueryscheduler.RulerScheduler
+	RulerStorage   rulestore.RuleStore
+	ConfigAPI      *configAPI.API
+	ConfigDB       db.DB
+	Alertmanager   *alertmanager.MultitenantAlertmanager
+	Compactor      *compactor.Compactor
+	StoreGateway   *storegateway.StoreGateway
+	MemberlistKV   *memberlist.KVInitService
 
 	// Queryables that the querier should use to query the long
 	// term storage. It depends on the storage engine used.

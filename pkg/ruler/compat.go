@@ -3,6 +3,7 @@ package ruler
 import (
 	"context"
 	"errors"
+	"github.com/cortexproject/cortex/pkg/rulerqueryscheduler"
 	"time"
 
 	"github.com/go-kit/log"
@@ -155,8 +156,9 @@ type RulesLimits interface {
 // EngineQueryFunc returns a new engine query function by passing an altered timestamp.
 // Modified from Prometheus rules.EngineQueryFunc
 // https://github.com/prometheus/prometheus/blob/v2.39.1/rules/manager.go#L189.
-func EngineQueryFunc(engine v1.QueryEngine, q storage.Queryable, overrides RulesLimits, userID string) rules.QueryFunc {
+func EngineQueryFunc(engine v1.QueryEngine, q storage.Queryable, overrides RulesLimits, userID string, pool rulerqueryscheduler.ClientsPool) rules.QueryFunc {
 	return func(ctx context.Context, qs string, t time.Time) (promql.Vector, error) {
+		//pool.
 		evaluationDelay := overrides.EvaluationDelay(userID)
 		q, err := engine.NewInstantQuery(ctx, q, nil, qs, t.Add(-evaluationDelay))
 		if err != nil {
@@ -279,7 +281,7 @@ type RulesManager interface {
 // ManagerFactory is a function that creates new RulesManager for given user and notifier.Manager.
 type ManagerFactory func(ctx context.Context, userID string, notifier *notifier.Manager, logger log.Logger, reg prometheus.Registerer) RulesManager
 
-func DefaultTenantManagerFactory(cfg Config, p Pusher, q storage.Queryable, engine v1.QueryEngine, overrides RulesLimits, reg prometheus.Registerer) ManagerFactory {
+func DefaultTenantManagerFactory(cfg Config, p Pusher, q storage.Queryable, engine v1.QueryEngine, overrides RulesLimits, reg prometheus.Registerer, pool rulerqueryscheduler.ClientsPool) ManagerFactory {
 	totalWritesVec := promauto.With(reg).NewCounterVec(prometheus.CounterOpts{
 		Name: "cortex_ruler_write_requests_total",
 		Help: "Number of write requests to ingesters.",
@@ -321,7 +323,7 @@ func DefaultTenantManagerFactory(cfg Config, p Pusher, q storage.Queryable, engi
 		totalWrites := totalWritesVec.WithLabelValues(userID)
 		failedWrites := failedWritesVec.WithLabelValues(userID)
 
-		engineQueryFunc := EngineQueryFunc(engine, q, overrides, userID)
+		engineQueryFunc := EngineQueryFunc(engine, q, overrides, userID, pool)
 		metricsQueryFunc := MetricsQueryFunc(engineQueryFunc, totalQueries, failedQueries)
 
 		return rules.NewManager(&rules.ManagerOptions{

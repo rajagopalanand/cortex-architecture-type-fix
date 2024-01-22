@@ -1,0 +1,30 @@
+syntax = "proto3";
+package rulerqueryscheduler;
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "github.com/cortexproject/cortex/pkg/cortexpb/cortex.proto";
+
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+
+service RulerScheduler {
+  rpc Query(PromQLInstantQueryRequest) returns (PromQLInstantQueryResult) {};
+}
+
+message PromQLInstantQueryRequest {
+  string qs = 1;
+  google.protobuf.Timestamp ts = 6  [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+}
+
+message PromQLInstantQueryResult {
+  repeated Sample vector = 1 [(gogoproto.nullable) = false, (gogoproto.customtype) = "SampleAdapter"];
+}
+
+message Sample {
+  int64 T = 1;
+  double F = 2;
+  repeated cortexpb.LabelPair metric = 4 [(gogoproto.nullable) = false, (gogoproto.customtype) = "github.com/cortexproject/cortex/pkg/cortexpb.LabelAdapter"];
+}
