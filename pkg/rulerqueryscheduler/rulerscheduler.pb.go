@@ -5,10 +5,7 @@ package rulerqueryscheduler
 
 import (
 	context "context"
-	encoding_binary "encoding/binary"
 	fmt "fmt"
-	_ "github.com/cortexproject/cortex/pkg/cortexpb"
-	github_com_cortexproject_cortex_pkg_cortexpb "github.com/cortexproject/cortex/pkg/cortexpb"
 	_ "github.com/gogo/protobuf/gogoproto"
 	proto "github.com/gogo/protobuf/proto"
 	github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
@@ -21,6 +18,7 @@ import (
 	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
+	strconv "strconv"
 	strings "strings"
 	time "time"
 )
@@ -37,22 +35,76 @@ var _ = time.Kitchen
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
-type PromQLInstantQueryRequest struct {
-	Qs string    `protobuf:"bytes,1,opt,name=qs,proto3" json:"qs,omitempty"`
-	Ts time.Time `protobuf:"bytes,6,opt,name=ts,proto3,stdtime" json:"ts"`
+type RulerToSchedulerType int32
+
+const (
+	INIT    RulerToSchedulerType = 0
+	ENQUEUE RulerToSchedulerType = 1
+	CANCEL  RulerToSchedulerType = 2
+)
+
+var RulerToSchedulerType_name = map[int32]string{
+	0: "INIT",
+	1: "ENQUEUE",
+	2: "CANCEL",
 }
 
-func (m *PromQLInstantQueryRequest) Reset()      { *m = PromQLInstantQueryRequest{} }
-func (*PromQLInstantQueryRequest) ProtoMessage() {}
-func (*PromQLInstantQueryRequest) Descriptor() ([]byte, []int) {
+var RulerToSchedulerType_value = map[string]int32{
+	"INIT":    0,
+	"ENQUEUE": 1,
+	"CANCEL":  2,
+}
+
+func (RulerToSchedulerType) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_35c1e93bc0877357, []int{0}
 }
-func (m *PromQLInstantQueryRequest) XXX_Unmarshal(b []byte) error {
+
+type ScheduleEvaluationResponseStatus int32
+
+const (
+	OK                           ScheduleEvaluationResponseStatus = 0
+	TOO_MANY_REQUESTS_PER_TENANT ScheduleEvaluationResponseStatus = 1
+	ERROR                        ScheduleEvaluationResponseStatus = 2
+	SHUTTING_DOWN                ScheduleEvaluationResponseStatus = 3
+)
+
+var ScheduleEvaluationResponseStatus_name = map[int32]string{
+	0: "OK",
+	1: "TOO_MANY_REQUESTS_PER_TENANT",
+	2: "ERROR",
+	3: "SHUTTING_DOWN",
+}
+
+var ScheduleEvaluationResponseStatus_value = map[string]int32{
+	"OK":                           0,
+	"TOO_MANY_REQUESTS_PER_TENANT": 1,
+	"ERROR":                        2,
+	"SHUTTING_DOWN":                3,
+}
+
+func (ScheduleEvaluationResponseStatus) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_35c1e93bc0877357, []int{1}
+}
+
+type ScheduleEvaluationRequest struct {
+	Type          RulerToSchedulerType `protobuf:"varint,1,opt,name=type,proto3,enum=rulerqueryscheduler.RulerToSchedulerType" json:"type,omitempty"`
+	UserID        string               `protobuf:"bytes,2,opt,name=userID,proto3" json:"userID,omitempty"`
+	Namespace     string               `protobuf:"bytes,3,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	RuleGroup     string               `protobuf:"bytes,4,opt,name=ruleGroup,proto3" json:"ruleGroup,omitempty"`
+	EvalTimestamp time.Time            `protobuf:"bytes,5,opt,name=evalTimestamp,proto3,stdtime" json:"evalTimestamp"`
+}
+
+func (m *ScheduleEvaluationRequest) Reset()      { *m = ScheduleEvaluationRequest{} }
+func (*ScheduleEvaluationRequest) ProtoMessage() {}
+func (*ScheduleEvaluationRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_35c1e93bc0877357, []int{0}
+}
+func (m *ScheduleEvaluationRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *PromQLInstantQueryRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *ScheduleEvaluationRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_PromQLInstantQueryRequest.Marshal(b, m, deterministic)
+		return xxx_messageInfo_ScheduleEvaluationRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -62,47 +114,69 @@ func (m *PromQLInstantQueryRequest) XXX_Marshal(b []byte, deterministic bool) ([
 		return b[:n], nil
 	}
 }
-func (m *PromQLInstantQueryRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PromQLInstantQueryRequest.Merge(m, src)
+func (m *ScheduleEvaluationRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ScheduleEvaluationRequest.Merge(m, src)
 }
-func (m *PromQLInstantQueryRequest) XXX_Size() int {
+func (m *ScheduleEvaluationRequest) XXX_Size() int {
 	return m.Size()
 }
-func (m *PromQLInstantQueryRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_PromQLInstantQueryRequest.DiscardUnknown(m)
+func (m *ScheduleEvaluationRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_ScheduleEvaluationRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_PromQLInstantQueryRequest proto.InternalMessageInfo
+var xxx_messageInfo_ScheduleEvaluationRequest proto.InternalMessageInfo
 
-func (m *PromQLInstantQueryRequest) GetQs() string {
+func (m *ScheduleEvaluationRequest) GetType() RulerToSchedulerType {
 	if m != nil {
-		return m.Qs
+		return m.Type
+	}
+	return INIT
+}
+
+func (m *ScheduleEvaluationRequest) GetUserID() string {
+	if m != nil {
+		return m.UserID
 	}
 	return ""
 }
 
-func (m *PromQLInstantQueryRequest) GetTs() time.Time {
+func (m *ScheduleEvaluationRequest) GetNamespace() string {
 	if m != nil {
-		return m.Ts
+		return m.Namespace
+	}
+	return ""
+}
+
+func (m *ScheduleEvaluationRequest) GetRuleGroup() string {
+	if m != nil {
+		return m.RuleGroup
+	}
+	return ""
+}
+
+func (m *ScheduleEvaluationRequest) GetEvalTimestamp() time.Time {
+	if m != nil {
+		return m.EvalTimestamp
 	}
 	return time.Time{}
 }
 
-type PromQLInstantQueryResult struct {
-	Vector []SampleAdapter `protobuf:"bytes,1,rep,name=vector,proto3,customtype=SampleAdapter" json:"vector"`
+type ScheduleEvaluationResponse struct {
+	Status ScheduleEvaluationResponseStatus `protobuf:"varint,1,opt,name=status,proto3,enum=rulerqueryscheduler.ScheduleEvaluationResponseStatus" json:"status,omitempty"`
+	Error  string                           `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
 }
 
-func (m *PromQLInstantQueryResult) Reset()      { *m = PromQLInstantQueryResult{} }
-func (*PromQLInstantQueryResult) ProtoMessage() {}
-func (*PromQLInstantQueryResult) Descriptor() ([]byte, []int) {
+func (m *ScheduleEvaluationResponse) Reset()      { *m = ScheduleEvaluationResponse{} }
+func (*ScheduleEvaluationResponse) ProtoMessage() {}
+func (*ScheduleEvaluationResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_35c1e93bc0877357, []int{1}
 }
-func (m *PromQLInstantQueryResult) XXX_Unmarshal(b []byte) error {
+func (m *ScheduleEvaluationResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *PromQLInstantQueryResult) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *ScheduleEvaluationResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_PromQLInstantQueryResult.Marshal(b, m, deterministic)
+		return xxx_messageInfo_ScheduleEvaluationResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -112,118 +186,100 @@ func (m *PromQLInstantQueryResult) XXX_Marshal(b []byte, deterministic bool) ([]
 		return b[:n], nil
 	}
 }
-func (m *PromQLInstantQueryResult) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PromQLInstantQueryResult.Merge(m, src)
+func (m *ScheduleEvaluationResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ScheduleEvaluationResponse.Merge(m, src)
 }
-func (m *PromQLInstantQueryResult) XXX_Size() int {
+func (m *ScheduleEvaluationResponse) XXX_Size() int {
 	return m.Size()
 }
-func (m *PromQLInstantQueryResult) XXX_DiscardUnknown() {
-	xxx_messageInfo_PromQLInstantQueryResult.DiscardUnknown(m)
+func (m *ScheduleEvaluationResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_ScheduleEvaluationResponse.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_PromQLInstantQueryResult proto.InternalMessageInfo
+var xxx_messageInfo_ScheduleEvaluationResponse proto.InternalMessageInfo
 
-type Sample struct {
-	T      int64                                                       `protobuf:"varint,1,opt,name=T,proto3" json:"T,omitempty"`
-	F      float64                                                     `protobuf:"fixed64,2,opt,name=F,proto3" json:"F,omitempty"`
-	Metric []github_com_cortexproject_cortex_pkg_cortexpb.LabelAdapter `protobuf:"bytes,4,rep,name=metric,proto3,customtype=github.com/cortexproject/cortex/pkg/cortexpb.LabelAdapter" json:"metric"`
-}
-
-func (m *Sample) Reset()      { *m = Sample{} }
-func (*Sample) ProtoMessage() {}
-func (*Sample) Descriptor() ([]byte, []int) {
-	return fileDescriptor_35c1e93bc0877357, []int{2}
-}
-func (m *Sample) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Sample) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_Sample.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *Sample) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Sample.Merge(m, src)
-}
-func (m *Sample) XXX_Size() int {
-	return m.Size()
-}
-func (m *Sample) XXX_DiscardUnknown() {
-	xxx_messageInfo_Sample.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Sample proto.InternalMessageInfo
-
-func (m *Sample) GetT() int64 {
+func (m *ScheduleEvaluationResponse) GetStatus() ScheduleEvaluationResponseStatus {
 	if m != nil {
-		return m.T
+		return m.Status
 	}
-	return 0
+	return OK
 }
 
-func (m *Sample) GetF() float64 {
+func (m *ScheduleEvaluationResponse) GetError() string {
 	if m != nil {
-		return m.F
+		return m.Error
 	}
-	return 0
+	return ""
 }
 
 func init() {
-	proto.RegisterType((*PromQLInstantQueryRequest)(nil), "rulerqueryscheduler.PromQLInstantQueryRequest")
-	proto.RegisterType((*PromQLInstantQueryResult)(nil), "rulerqueryscheduler.PromQLInstantQueryResult")
-	proto.RegisterType((*Sample)(nil), "rulerqueryscheduler.Sample")
+	proto.RegisterEnum("rulerqueryscheduler.RulerToSchedulerType", RulerToSchedulerType_name, RulerToSchedulerType_value)
+	proto.RegisterEnum("rulerqueryscheduler.ScheduleEvaluationResponseStatus", ScheduleEvaluationResponseStatus_name, ScheduleEvaluationResponseStatus_value)
+	proto.RegisterType((*ScheduleEvaluationRequest)(nil), "rulerqueryscheduler.ScheduleEvaluationRequest")
+	proto.RegisterType((*ScheduleEvaluationResponse)(nil), "rulerqueryscheduler.ScheduleEvaluationResponse")
 }
 
 func init() { proto.RegisterFile("rulerscheduler.proto", fileDescriptor_35c1e93bc0877357) }
 
 var fileDescriptor_35c1e93bc0877357 = []byte{
-	// 433 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x51, 0xbd, 0x6e, 0x13, 0x41,
-	0x10, 0xde, 0xb9, 0xc0, 0x09, 0x36, 0x90, 0x62, 0x13, 0xa4, 0xc3, 0x48, 0x6b, 0xcb, 0x95, 0x1b,
-	0xf6, 0x24, 0x93, 0x86, 0x32, 0x2e, 0x22, 0x81, 0x52, 0x24, 0x17, 0xbf, 0xc0, 0xde, 0x79, 0x73,
-	0x3e, 0xb8, 0xf3, 0x9e, 0x77, 0xe7, 0x10, 0x50, 0xf1, 0x08, 0x29, 0x78, 0x08, 0x1e, 0x25, 0xa5,
-	0xcb, 0x88, 0x22, 0xe0, 0x73, 0x43, 0x99, 0x47, 0x40, 0xf7, 0xe7, 0x02, 0x19, 0x09, 0xba, 0xf9,
-	0xf6, 0x9b, 0x9d, 0xef, 0x9b, 0x6f, 0xe8, 0x91, 0x29, 0x52, 0x65, 0x6c, 0x34, 0x57, 0xb3, 0xaa,
-	0x10, 0xb9, 0xd1, 0xa8, 0xd9, 0x61, 0xfd, 0xba, 0x2c, 0x94, 0xf9, 0xb4, 0xa5, 0x7a, 0x47, 0xb1,
-	0x8e, 0x75, 0xcd, 0xfb, 0x55, 0xd5, 0xb4, 0xf6, 0x78, 0xac, 0x75, 0x9c, 0x2a, 0xbf, 0x46, 0x61,
-	0x71, 0xe5, 0xcf, 0x0a, 0x23, 0x31, 0xd1, 0x8b, 0x96, 0xef, 0xff, 0xc9, 0x63, 0x92, 0x29, 0x8b,
-	0x32, 0xcb, 0xdb, 0x86, 0xd7, 0x71, 0x82, 0xf3, 0x22, 0x14, 0x91, 0xce, 0xfc, 0x48, 0x1b, 0x54,
-	0x1f, 0x73, 0xa3, 0xdf, 0xa9, 0x08, 0x5b, 0xe4, 0xe7, 0xef, 0xe3, 0x8e, 0x08, 0xdb, 0xa2, 0xf9,
-	0x3a, 0x94, 0xf4, 0xf9, 0xb9, 0xd1, 0xd9, 0xc5, 0xd9, 0x9b, 0x85, 0x45, 0xb9, 0xc0, 0x8b, 0xca,
-	0x70, 0xa0, 0x96, 0x85, 0xb2, 0xc8, 0x0e, 0xa8, 0xb3, 0xb4, 0x1e, 0x0c, 0x60, 0xf4, 0x38, 0x70,
-	0x96, 0x96, 0x1d, 0x53, 0x07, 0xad, 0xe7, 0x0e, 0x60, 0xb4, 0x3f, 0xee, 0x89, 0xc6, 0x95, 0xe8,
-	0x5c, 0x89, 0x69, 0xe7, 0x6a, 0xf2, 0xe8, 0xe6, 0xae, 0x4f, 0xae, 0x7f, 0xf4, 0x21, 0x70, 0xd0,
-	0x0e, 0xaf, 0xa8, 0xb7, 0x4b, 0xc2, 0x16, 0x29, 0xb2, 0xb7, 0xd4, 0xfd, 0xa0, 0x22, 0xd4, 0xc6,
-	0x83, 0xc1, 0xde, 0x68, 0x7f, 0xfc, 0x42, 0xec, 0x88, 0x4d, 0x5c, 0xca, 0x2c, 0x4f, 0xd5, 0xe4,
-	0x59, 0x35, 0xf6, 0xfb, 0x5d, 0xff, 0x69, 0x83, 0x4f, 0x66, 0x32, 0x47, 0x65, 0x82, 0x76, 0xc2,
-	0xf0, 0x2b, 0x50, 0xb7, 0x61, 0xd8, 0x13, 0x0a, 0xd3, 0xda, 0xf7, 0x5e, 0x00, 0xd3, 0x0a, 0x9d,
-	0x7a, 0xce, 0x00, 0x46, 0x10, 0xc0, 0x29, 0x5b, 0x50, 0x37, 0x53, 0x68, 0x92, 0xc8, 0x7b, 0x50,
-	0x4b, 0x1e, 0x8a, 0x2e, 0x19, 0x71, 0x26, 0x43, 0x95, 0x9e, 0xcb, 0xc4, 0x4c, 0x4e, 0x5a, 0xa9,
-	0xff, 0x4a, 0xb6, 0xf9, 0xbf, 0xb5, 0xd5, 0xa8, 0x8c, 0x3f, 0xd3, 0x83, 0xa0, 0xda, 0xe2, 0xb2,
-	0x5b, 0x87, 0xcd, 0xe9, 0xc3, 0x3a, 0x03, 0x26, 0x76, 0x6e, 0xfb, 0xd7, 0x7b, 0xf4, 0x5e, 0xfe,
-	0x73, 0x7f, 0x15, 0xee, 0x90, 0x4c, 0x8e, 0x57, 0x6b, 0x4e, 0x6e, 0xd7, 0x9c, 0xdc, 0xaf, 0x39,
-	0x7c, 0x29, 0x39, 0x7c, 0x2b, 0x39, 0xdc, 0x94, 0x1c, 0x56, 0x25, 0x87, 0x9f, 0x25, 0x87, 0x5f,
-	0x25, 0x27, 0xf7, 0x25, 0x87, 0xeb, 0x0d, 0x27, 0xab, 0x0d, 0x27, 0xb7, 0x1b, 0x4e, 0x42, 0xb7,
-	0x3e, 0xe9, 0xab, 0xdf, 0x01, 0x00, 0x00, 0xff, 0xff, 0x00, 0x03, 0xbf, 0x40, 0xd9, 0x02, 0x00,
+	// 513 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x52, 0xc1, 0x6f, 0x12, 0x4f,
+	0x14, 0xde, 0xa1, 0x40, 0xcb, 0x6b, 0xfa, 0xcb, 0x76, 0x7e, 0xc4, 0x20, 0x69, 0x06, 0xc2, 0x09,
+	0x7b, 0x58, 0x0c, 0xea, 0xc1, 0x83, 0x07, 0xda, 0x8e, 0x15, 0xb5, 0x8b, 0x1d, 0x86, 0x18, 0x4f,
+	0x64, 0xdb, 0x8e, 0x58, 0x03, 0xcc, 0x32, 0xbb, 0xd3, 0x84, 0x9b, 0x1e, 0xbc, 0xf7, 0xcf, 0xf0,
+	0x4f, 0xe9, 0x91, 0x63, 0x4f, 0x2a, 0xcb, 0xc5, 0x63, 0xcf, 0x9e, 0x0c, 0xb3, 0x0b, 0x46, 0x83,
+	0x51, 0x2f, 0x93, 0x79, 0xef, 0x7b, 0xdf, 0x7b, 0xef, 0xfb, 0xf2, 0x20, 0xaf, 0x74, 0x5f, 0xa8,
+	0xe0, 0xf4, 0x8d, 0x38, 0x9b, 0x7f, 0x1c, 0x5f, 0xc9, 0x50, 0xe2, 0xff, 0x4d, 0x76, 0xa4, 0x85,
+	0x1a, 0x2f, 0xa1, 0x62, 0xbe, 0x27, 0x7b, 0xd2, 0xe0, 0xb5, 0xf9, 0x2f, 0x2e, 0x2d, 0x92, 0x9e,
+	0x94, 0xbd, 0xbe, 0xa8, 0x99, 0xe8, 0x44, 0xbf, 0xae, 0x9d, 0x69, 0xe5, 0x85, 0xe7, 0x72, 0x98,
+	0xe0, 0xa5, 0x5f, 0xf1, 0xf0, 0x7c, 0x20, 0x82, 0xd0, 0x1b, 0xf8, 0x71, 0x41, 0xe5, 0x1b, 0x82,
+	0xdb, 0xed, 0x64, 0x08, 0xbd, 0xf0, 0xfa, 0xda, 0xb0, 0x99, 0x18, 0x69, 0x11, 0x84, 0xf8, 0x11,
+	0xa4, 0xc3, 0xb1, 0x2f, 0x0a, 0xa8, 0x8c, 0xaa, 0xff, 0xd5, 0xef, 0x38, 0x2b, 0x16, 0x73, 0xd8,
+	0xfc, 0xe5, 0x72, 0xd1, 0x44, 0xf1, 0xb1, 0x2f, 0x98, 0xa1, 0xe1, 0x5b, 0x90, 0xd5, 0x81, 0x50,
+	0xcd, 0x83, 0x42, 0xaa, 0x8c, 0xaa, 0x39, 0x96, 0x44, 0x78, 0x07, 0x72, 0x43, 0x6f, 0x20, 0x02,
+	0xdf, 0x3b, 0x15, 0x85, 0x35, 0x03, 0xfd, 0x48, 0xcc, 0xd1, 0xf9, 0x9c, 0x43, 0x25, 0xb5, 0x5f,
+	0x48, 0xc7, 0xe8, 0x32, 0x81, 0x9f, 0xc2, 0x96, 0xb8, 0xf0, 0xfa, 0x7c, 0xa1, 0xa3, 0x90, 0x29,
+	0xa3, 0xea, 0x66, 0xbd, 0xe8, 0xc4, 0x4a, 0x9d, 0x85, 0x52, 0x67, 0x59, 0xb1, 0xb7, 0x71, 0xf5,
+	0xa9, 0x64, 0x5d, 0x7e, 0x2e, 0x21, 0xf6, 0x33, 0xb5, 0xf2, 0x1e, 0x41, 0x71, 0x95, 0xf8, 0xc0,
+	0x97, 0xc3, 0x40, 0xe0, 0x23, 0xc8, 0x06, 0xa1, 0x17, 0xea, 0x20, 0xd1, 0xff, 0x60, 0xa5, 0xfe,
+	0xdf, 0x37, 0x68, 0x1b, 0x32, 0x4b, 0x9a, 0xe0, 0x3c, 0x64, 0x84, 0x52, 0x52, 0x25, 0x66, 0xc4,
+	0xc1, 0xee, 0x43, 0xc8, 0xaf, 0x72, 0x10, 0x6f, 0x40, 0xba, 0xe9, 0x36, 0xb9, 0x6d, 0xe1, 0x4d,
+	0x58, 0xa7, 0xee, 0x71, 0x87, 0x76, 0xa8, 0x8d, 0x30, 0x40, 0x76, 0xbf, 0xe1, 0xee, 0xd3, 0xe7,
+	0x76, 0x6a, 0xf7, 0x2d, 0x94, 0xff, 0x34, 0x1c, 0x67, 0x21, 0xd5, 0x7a, 0x66, 0x5b, 0xb8, 0x0c,
+	0x3b, 0xbc, 0xd5, 0xea, 0x1e, 0x35, 0xdc, 0x57, 0x5d, 0x46, 0x8f, 0x3b, 0xb4, 0xcd, 0xdb, 0xdd,
+	0x17, 0x94, 0x75, 0x39, 0x75, 0x1b, 0x2e, 0xb7, 0x11, 0xce, 0x41, 0x86, 0x32, 0xd6, 0x62, 0x76,
+	0x0a, 0x6f, 0xc3, 0x56, 0xfb, 0x49, 0x87, 0xf3, 0xa6, 0x7b, 0xd8, 0x3d, 0x68, 0xbd, 0x74, 0xed,
+	0xb5, 0xfa, 0x07, 0x04, 0xdb, 0xcb, 0x05, 0x1f, 0x4b, 0x65, 0x76, 0xc6, 0x3e, 0xac, 0xd3, 0xe1,
+	0x48, 0x0b, 0x2d, 0xb0, 0xf3, 0xd7, 0xe6, 0x98, 0xd3, 0x2a, 0xd6, 0xfe, 0xd1, 0xcc, 0x8a, 0x55,
+	0x45, 0x77, 0xd1, 0xde, 0xfd, 0xc9, 0x94, 0x58, 0xd7, 0x53, 0x62, 0xdd, 0x4c, 0x09, 0x7a, 0x17,
+	0x11, 0xf4, 0x31, 0x22, 0xe8, 0x2a, 0x22, 0x68, 0x12, 0x11, 0xf4, 0x25, 0x22, 0xe8, 0x6b, 0x44,
+	0xac, 0x9b, 0x88, 0xa0, 0xcb, 0x19, 0xb1, 0x26, 0x33, 0x62, 0x5d, 0xcf, 0x88, 0x75, 0x92, 0x35,
+	0x57, 0x71, 0xef, 0x7b, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xc7, 0xf5, 0x94, 0x70, 0x03, 0x00,
 	0x00,
 }
 
-func (this *PromQLInstantQueryRequest) Equal(that interface{}) bool {
+func (x RulerToSchedulerType) String() string {
+	s, ok := RulerToSchedulerType_name[int32(x)]
+	if ok {
+		return s
+	}
+	return strconv.Itoa(int(x))
+}
+func (x ScheduleEvaluationResponseStatus) String() string {
+	s, ok := ScheduleEvaluationResponseStatus_name[int32(x)]
+	if ok {
+		return s
+	}
+	return strconv.Itoa(int(x))
+}
+func (this *ScheduleEvaluationRequest) Equal(that interface{}) bool {
 	if that == nil {
 		return this == nil
 	}
 
-	that1, ok := that.(*PromQLInstantQueryRequest)
+	that1, ok := that.(*ScheduleEvaluationRequest)
 	if !ok {
-		that2, ok := that.(PromQLInstantQueryRequest)
+		that2, ok := that.(ScheduleEvaluationRequest)
 		if ok {
 			that1 = &that2
 		} else {
@@ -235,22 +291,31 @@ func (this *PromQLInstantQueryRequest) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if this.Qs != that1.Qs {
+	if this.Type != that1.Type {
 		return false
 	}
-	if !this.Ts.Equal(that1.Ts) {
+	if this.UserID != that1.UserID {
+		return false
+	}
+	if this.Namespace != that1.Namespace {
+		return false
+	}
+	if this.RuleGroup != that1.RuleGroup {
+		return false
+	}
+	if !this.EvalTimestamp.Equal(that1.EvalTimestamp) {
 		return false
 	}
 	return true
 }
-func (this *PromQLInstantQueryResult) Equal(that interface{}) bool {
+func (this *ScheduleEvaluationResponse) Equal(that interface{}) bool {
 	if that == nil {
 		return this == nil
 	}
 
-	that1, ok := that.(*PromQLInstantQueryResult)
+	that1, ok := that.(*ScheduleEvaluationResponse)
 	if !ok {
-		that2, ok := that.(PromQLInstantQueryResult)
+		that2, ok := that.(ScheduleEvaluationResponse)
 		if ok {
 			that1 = &that2
 		} else {
@@ -262,81 +327,36 @@ func (this *PromQLInstantQueryResult) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if len(this.Vector) != len(that1.Vector) {
+	if this.Status != that1.Status {
 		return false
 	}
-	for i := range this.Vector {
-		if !this.Vector[i].Equal(that1.Vector[i]) {
-			return false
-		}
+	if this.Error != that1.Error {
+		return false
 	}
 	return true
 }
-func (this *Sample) Equal(that interface{}) bool {
-	if that == nil {
-		return this == nil
+func (this *ScheduleEvaluationRequest) GoString() string {
+	if this == nil {
+		return "nil"
 	}
-
-	that1, ok := that.(*Sample)
-	if !ok {
-		that2, ok := that.(Sample)
-		if ok {
-			that1 = &that2
-		} else {
-			return false
-		}
-	}
-	if that1 == nil {
-		return this == nil
-	} else if this == nil {
-		return false
-	}
-	if this.T != that1.T {
-		return false
-	}
-	if this.F != that1.F {
-		return false
-	}
-	if len(this.Metric) != len(that1.Metric) {
-		return false
-	}
-	for i := range this.Metric {
-		if !this.Metric[i].Equal(that1.Metric[i]) {
-			return false
-		}
-	}
-	return true
+	s := make([]string, 0, 9)
+	s = append(s, "&rulerqueryscheduler.ScheduleEvaluationRequest{")
+	s = append(s, "Type: "+fmt.Sprintf("%#v", this.Type)+",\n")
+	s = append(s, "UserID: "+fmt.Sprintf("%#v", this.UserID)+",\n")
+	s = append(s, "Namespace: "+fmt.Sprintf("%#v", this.Namespace)+",\n")
+	s = append(s, "RuleGroup: "+fmt.Sprintf("%#v", this.RuleGroup)+",\n")
+	s = append(s, "EvalTimestamp: "+fmt.Sprintf("%#v", this.EvalTimestamp)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
-func (this *PromQLInstantQueryRequest) GoString() string {
+func (this *ScheduleEvaluationResponse) GoString() string {
 	if this == nil {
 		return "nil"
 	}
 	s := make([]string, 0, 6)
-	s = append(s, "&rulerqueryscheduler.PromQLInstantQueryRequest{")
-	s = append(s, "Qs: "+fmt.Sprintf("%#v", this.Qs)+",\n")
-	s = append(s, "Ts: "+fmt.Sprintf("%#v", this.Ts)+",\n")
-	s = append(s, "}")
-	return strings.Join(s, "")
-}
-func (this *PromQLInstantQueryResult) GoString() string {
-	if this == nil {
-		return "nil"
-	}
-	s := make([]string, 0, 5)
-	s = append(s, "&rulerqueryscheduler.PromQLInstantQueryResult{")
-	s = append(s, "Vector: "+fmt.Sprintf("%#v", this.Vector)+",\n")
-	s = append(s, "}")
-	return strings.Join(s, "")
-}
-func (this *Sample) GoString() string {
-	if this == nil {
-		return "nil"
-	}
-	s := make([]string, 0, 7)
-	s = append(s, "&rulerqueryscheduler.Sample{")
-	s = append(s, "T: "+fmt.Sprintf("%#v", this.T)+",\n")
-	s = append(s, "F: "+fmt.Sprintf("%#v", this.F)+",\n")
-	s = append(s, "Metric: "+fmt.Sprintf("%#v", this.Metric)+",\n")
+	s = append(s, "&rulerqueryscheduler.ScheduleEvaluationResponse{")
+	s = append(s, "Status: "+fmt.Sprintf("%#v", this.Status)+",\n")
+	s = append(s, "Error: "+fmt.Sprintf("%#v", this.Error)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -357,79 +377,111 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// RulerSchedulerClient is the client API for RulerScheduler service.
+// SchedulerForRulerClient is the client API for SchedulerForRuler service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
-type RulerSchedulerClient interface {
-	Query(ctx context.Context, in *PromQLInstantQueryRequest, opts ...grpc.CallOption) (*PromQLInstantQueryResult, error)
+type SchedulerForRulerClient interface {
+	Enqueue(ctx context.Context, opts ...grpc.CallOption) (SchedulerForRuler_EnqueueClient, error)
 }
 
-type rulerSchedulerClient struct {
+type schedulerForRulerClient struct {
 	cc *grpc.ClientConn
 }
 
-func NewRulerSchedulerClient(cc *grpc.ClientConn) RulerSchedulerClient {
-	return &rulerSchedulerClient{cc}
+func NewSchedulerForRulerClient(cc *grpc.ClientConn) SchedulerForRulerClient {
+	return &schedulerForRulerClient{cc}
 }
 
-func (c *rulerSchedulerClient) Query(ctx context.Context, in *PromQLInstantQueryRequest, opts ...grpc.CallOption) (*PromQLInstantQueryResult, error) {
-	out := new(PromQLInstantQueryResult)
-	err := c.cc.Invoke(ctx, "/rulerqueryscheduler.RulerScheduler/Query", in, out, opts...)
+func (c *schedulerForRulerClient) Enqueue(ctx context.Context, opts ...grpc.CallOption) (SchedulerForRuler_EnqueueClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_SchedulerForRuler_serviceDesc.Streams[0], "/rulerqueryscheduler.SchedulerForRuler/Enqueue", opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &schedulerForRulerEnqueueClient{stream}
+	return x, nil
 }
 
-// RulerSchedulerServer is the server API for RulerScheduler service.
-type RulerSchedulerServer interface {
-	Query(context.Context, *PromQLInstantQueryRequest) (*PromQLInstantQueryResult, error)
+type SchedulerForRuler_EnqueueClient interface {
+	Send(*ScheduleEvaluationRequest) error
+	Recv() (*ScheduleEvaluationResponse, error)
+	grpc.ClientStream
 }
 
-// UnimplementedRulerSchedulerServer can be embedded to have forward compatible implementations.
-type UnimplementedRulerSchedulerServer struct {
+type schedulerForRulerEnqueueClient struct {
+	grpc.ClientStream
 }
 
-func (*UnimplementedRulerSchedulerServer) Query(ctx context.Context, req *PromQLInstantQueryRequest) (*PromQLInstantQueryResult, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Query not implemented")
+func (x *schedulerForRulerEnqueueClient) Send(m *ScheduleEvaluationRequest) error {
+	return x.ClientStream.SendMsg(m)
 }
 
-func RegisterRulerSchedulerServer(s *grpc.Server, srv RulerSchedulerServer) {
-	s.RegisterService(&_RulerScheduler_serviceDesc, srv)
-}
-
-func _RulerScheduler_Query_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PromQLInstantQueryRequest)
-	if err := dec(in); err != nil {
+func (x *schedulerForRulerEnqueueClient) Recv() (*ScheduleEvaluationResponse, error) {
+	m := new(ScheduleEvaluationResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
-	if interceptor == nil {
-		return srv.(RulerSchedulerServer).Query(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/rulerqueryscheduler.RulerScheduler/Query",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RulerSchedulerServer).Query(ctx, req.(*PromQLInstantQueryRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+	return m, nil
 }
 
-var _RulerScheduler_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "rulerqueryscheduler.RulerScheduler",
-	HandlerType: (*RulerSchedulerServer)(nil),
-	Methods: []grpc.MethodDesc{
+// SchedulerForRulerServer is the server API for SchedulerForRuler service.
+type SchedulerForRulerServer interface {
+	Enqueue(SchedulerForRuler_EnqueueServer) error
+}
+
+// UnimplementedSchedulerForRulerServer can be embedded to have forward compatible implementations.
+type UnimplementedSchedulerForRulerServer struct {
+}
+
+func (*UnimplementedSchedulerForRulerServer) Enqueue(srv SchedulerForRuler_EnqueueServer) error {
+	return status.Errorf(codes.Unimplemented, "method Enqueue not implemented")
+}
+
+func RegisterSchedulerForRulerServer(s *grpc.Server, srv SchedulerForRulerServer) {
+	s.RegisterService(&_SchedulerForRuler_serviceDesc, srv)
+}
+
+func _SchedulerForRuler_Enqueue_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(SchedulerForRulerServer).Enqueue(&schedulerForRulerEnqueueServer{stream})
+}
+
+type SchedulerForRuler_EnqueueServer interface {
+	Send(*ScheduleEvaluationResponse) error
+	Recv() (*ScheduleEvaluationRequest, error)
+	grpc.ServerStream
+}
+
+type schedulerForRulerEnqueueServer struct {
+	grpc.ServerStream
+}
+
+func (x *schedulerForRulerEnqueueServer) Send(m *ScheduleEvaluationResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *schedulerForRulerEnqueueServer) Recv() (*ScheduleEvaluationRequest, error) {
+	m := new(ScheduleEvaluationRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+var _SchedulerForRuler_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "rulerqueryscheduler.SchedulerForRuler",
+	HandlerType: (*SchedulerForRulerServer)(nil),
+	Methods:     []grpc.MethodDesc{},
+	Streams: []grpc.StreamDesc{
 		{
-			MethodName: "Query",
-			Handler:    _RulerScheduler_Query_Handler,
+			StreamName:    "Enqueue",
+			Handler:       _SchedulerForRuler_Enqueue_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
 	Metadata: "rulerscheduler.proto",
 }
 
-func (m *PromQLInstantQueryRequest) Marshal() (dAtA []byte, err error) {
+func (m *ScheduleEvaluationRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -439,35 +491,54 @@ func (m *PromQLInstantQueryRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *PromQLInstantQueryRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *ScheduleEvaluationRequest) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *PromQLInstantQueryRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *ScheduleEvaluationRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	n1, err1 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.Ts, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.Ts):])
+	n1, err1 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.EvalTimestamp, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.EvalTimestamp):])
 	if err1 != nil {
 		return 0, err1
 	}
 	i -= n1
 	i = encodeVarintRulerscheduler(dAtA, i, uint64(n1))
 	i--
-	dAtA[i] = 0x32
-	if len(m.Qs) > 0 {
-		i -= len(m.Qs)
-		copy(dAtA[i:], m.Qs)
-		i = encodeVarintRulerscheduler(dAtA, i, uint64(len(m.Qs)))
+	dAtA[i] = 0x2a
+	if len(m.RuleGroup) > 0 {
+		i -= len(m.RuleGroup)
+		copy(dAtA[i:], m.RuleGroup)
+		i = encodeVarintRulerscheduler(dAtA, i, uint64(len(m.RuleGroup)))
 		i--
-		dAtA[i] = 0xa
+		dAtA[i] = 0x22
+	}
+	if len(m.Namespace) > 0 {
+		i -= len(m.Namespace)
+		copy(dAtA[i:], m.Namespace)
+		i = encodeVarintRulerscheduler(dAtA, i, uint64(len(m.Namespace)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.UserID) > 0 {
+		i -= len(m.UserID)
+		copy(dAtA[i:], m.UserID)
+		i = encodeVarintRulerscheduler(dAtA, i, uint64(len(m.UserID)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.Type != 0 {
+		i = encodeVarintRulerscheduler(dAtA, i, uint64(m.Type))
+		i--
+		dAtA[i] = 0x8
 	}
 	return len(dAtA) - i, nil
 }
 
-func (m *PromQLInstantQueryResult) Marshal() (dAtA []byte, err error) {
+func (m *ScheduleEvaluationResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -477,75 +548,25 @@ func (m *PromQLInstantQueryResult) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *PromQLInstantQueryResult) MarshalTo(dAtA []byte) (int, error) {
+func (m *ScheduleEvaluationResponse) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *PromQLInstantQueryResult) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *ScheduleEvaluationResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Vector) > 0 {
-		for iNdEx := len(m.Vector) - 1; iNdEx >= 0; iNdEx-- {
-			{
-				size := m.Vector[iNdEx].Size()
-				i -= size
-				if _, err := m.Vector[iNdEx].MarshalTo(dAtA[i:]); err != nil {
-					return 0, err
-				}
-				i = encodeVarintRulerscheduler(dAtA, i, uint64(size))
-			}
-			i--
-			dAtA[i] = 0xa
-		}
-	}
-	return len(dAtA) - i, nil
-}
-
-func (m *Sample) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *Sample) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *Sample) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if len(m.Metric) > 0 {
-		for iNdEx := len(m.Metric) - 1; iNdEx >= 0; iNdEx-- {
-			{
-				size := m.Metric[iNdEx].Size()
-				i -= size
-				if _, err := m.Metric[iNdEx].MarshalTo(dAtA[i:]); err != nil {
-					return 0, err
-				}
-				i = encodeVarintRulerscheduler(dAtA, i, uint64(size))
-			}
-			i--
-			dAtA[i] = 0x22
-		}
-	}
-	if m.F != 0 {
-		i -= 8
-		encoding_binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(m.F))))
+	if len(m.Error) > 0 {
+		i -= len(m.Error)
+		copy(dAtA[i:], m.Error)
+		i = encodeVarintRulerscheduler(dAtA, i, uint64(len(m.Error)))
 		i--
-		dAtA[i] = 0x11
+		dAtA[i] = 0x12
 	}
-	if m.T != 0 {
-		i = encodeVarintRulerscheduler(dAtA, i, uint64(m.T))
+	if m.Status != 0 {
+		i = encodeVarintRulerscheduler(dAtA, i, uint64(m.Status))
 		i--
 		dAtA[i] = 0x8
 	}
@@ -563,53 +584,44 @@ func encodeVarintRulerscheduler(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
-func (m *PromQLInstantQueryRequest) Size() (n int) {
+func (m *ScheduleEvaluationRequest) Size() (n int) {
 	if m == nil {
 		return 0
 	}
 	var l int
 	_ = l
-	l = len(m.Qs)
+	if m.Type != 0 {
+		n += 1 + sovRulerscheduler(uint64(m.Type))
+	}
+	l = len(m.UserID)
 	if l > 0 {
 		n += 1 + l + sovRulerscheduler(uint64(l))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.Ts)
+	l = len(m.Namespace)
+	if l > 0 {
+		n += 1 + l + sovRulerscheduler(uint64(l))
+	}
+	l = len(m.RuleGroup)
+	if l > 0 {
+		n += 1 + l + sovRulerscheduler(uint64(l))
+	}
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.EvalTimestamp)
 	n += 1 + l + sovRulerscheduler(uint64(l))
 	return n
 }
 
-func (m *PromQLInstantQueryResult) Size() (n int) {
+func (m *ScheduleEvaluationResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
 	var l int
 	_ = l
-	if len(m.Vector) > 0 {
-		for _, e := range m.Vector {
-			l = e.Size()
-			n += 1 + l + sovRulerscheduler(uint64(l))
-		}
+	if m.Status != 0 {
+		n += 1 + sovRulerscheduler(uint64(m.Status))
 	}
-	return n
-}
-
-func (m *Sample) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.T != 0 {
-		n += 1 + sovRulerscheduler(uint64(m.T))
-	}
-	if m.F != 0 {
-		n += 9
-	}
-	if len(m.Metric) > 0 {
-		for _, e := range m.Metric {
-			l = e.Size()
-			n += 1 + l + sovRulerscheduler(uint64(l))
-		}
+	l = len(m.Error)
+	if l > 0 {
+		n += 1 + l + sovRulerscheduler(uint64(l))
 	}
 	return n
 }
@@ -620,35 +632,27 @@ func sovRulerscheduler(x uint64) (n int) {
 func sozRulerscheduler(x uint64) (n int) {
 	return sovRulerscheduler(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (this *PromQLInstantQueryRequest) String() string {
+func (this *ScheduleEvaluationRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PromQLInstantQueryRequest{`,
-		`Qs:` + fmt.Sprintf("%v", this.Qs) + `,`,
-		`Ts:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Ts), "Timestamp", "timestamp.Timestamp", 1), `&`, ``, 1) + `,`,
+	s := strings.Join([]string{`&ScheduleEvaluationRequest{`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`UserID:` + fmt.Sprintf("%v", this.UserID) + `,`,
+		`Namespace:` + fmt.Sprintf("%v", this.Namespace) + `,`,
+		`RuleGroup:` + fmt.Sprintf("%v", this.RuleGroup) + `,`,
+		`EvalTimestamp:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.EvalTimestamp), "Timestamp", "timestamp.Timestamp", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *PromQLInstantQueryResult) String() string {
+func (this *ScheduleEvaluationResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PromQLInstantQueryResult{`,
-		`Vector:` + fmt.Sprintf("%v", this.Vector) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *Sample) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&Sample{`,
-		`T:` + fmt.Sprintf("%v", this.T) + `,`,
-		`F:` + fmt.Sprintf("%v", this.F) + `,`,
-		`Metric:` + fmt.Sprintf("%v", this.Metric) + `,`,
+	s := strings.Join([]string{`&ScheduleEvaluationResponse{`,
+		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
+		`Error:` + fmt.Sprintf("%v", this.Error) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -661,7 +665,7 @@ func valueToStringRulerscheduler(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *PromQLInstantQueryRequest) Unmarshal(dAtA []byte) error {
+func (m *ScheduleEvaluationRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -684,15 +688,34 @@ func (m *PromQLInstantQueryRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PromQLInstantQueryRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: ScheduleEvaluationRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PromQLInstantQueryRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ScheduleEvaluationRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			m.Type = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRulerscheduler
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Type |= RulerToSchedulerType(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Qs", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field UserID", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -720,11 +743,75 @@ func (m *PromQLInstantQueryRequest) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Qs = string(dAtA[iNdEx:postIndex])
+			m.UserID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 6:
+		case 3:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Ts", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Namespace", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRulerscheduler
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRulerscheduler
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRulerscheduler
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Namespace = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RuleGroup", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRulerscheduler
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRulerscheduler
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRulerscheduler
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RuleGroup = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EvalTimestamp", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -751,7 +838,7 @@ func (m *PromQLInstantQueryRequest) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.Ts, dAtA[iNdEx:postIndex]); err != nil {
+			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.EvalTimestamp, dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -779,7 +866,7 @@ func (m *PromQLInstantQueryRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *PromQLInstantQueryResult) Unmarshal(dAtA []byte) error {
+func (m *ScheduleEvaluationResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -802,104 +889,17 @@ func (m *PromQLInstantQueryResult) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PromQLInstantQueryResult: wiretype end group for non-group")
+			return fmt.Errorf("proto: ScheduleEvaluationResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PromQLInstantQueryResult: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Vector", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowRulerscheduler
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthRulerscheduler
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthRulerscheduler
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Vector = append(m.Vector, SampleAdapter{})
-			if err := m.Vector[len(m.Vector)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipRulerscheduler(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthRulerscheduler
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthRulerscheduler
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *Sample) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowRulerscheduler
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: Sample: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: Sample: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ScheduleEvaluationResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field T", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
 			}
-			m.T = 0
+			m.Status = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowRulerscheduler
@@ -909,27 +909,16 @@ func (m *Sample) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.T |= int64(b&0x7F) << shift
+				m.Status |= ScheduleEvaluationResponseStatus(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 2:
-			if wireType != 1 {
-				return fmt.Errorf("proto: wrong wireType = %d for field F", wireType)
-			}
-			var v uint64
-			if (iNdEx + 8) > l {
-				return io.ErrUnexpectedEOF
-			}
-			v = uint64(encoding_binary.LittleEndian.Uint64(dAtA[iNdEx:]))
-			iNdEx += 8
-			m.F = float64(math.Float64frombits(v))
-		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Metric", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Error", wireType)
 			}
-			var msglen int
+			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowRulerscheduler
@@ -939,25 +928,23 @@ func (m *Sample) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				msglen |= int(b&0x7F) << shift
+				stringLen |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			if msglen < 0 {
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
 				return ErrInvalidLengthRulerscheduler
 			}
-			postIndex := iNdEx + msglen
+			postIndex := iNdEx + intStringLen
 			if postIndex < 0 {
 				return ErrInvalidLengthRulerscheduler
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Metric = append(m.Metric, github_com_cortexproject_cortex_pkg_cortexpb.LabelAdapter{})
-			if err := m.Metric[len(m.Metric)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
+			m.Error = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

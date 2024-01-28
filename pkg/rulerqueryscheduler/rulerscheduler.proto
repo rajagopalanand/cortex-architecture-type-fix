@@ -4,27 +4,39 @@ package rulerqueryscheduler;
 import "gogoproto/gogo.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
-import "github.com/cortexproject/cortex/pkg/cortexpb/cortex.proto";
 
 
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 
-service RulerScheduler {
-  rpc Query(PromQLInstantQueryRequest) returns (PromQLInstantQueryResult) {};
+// SchedulerForRuler is exposed to either Rulers or a yet unnamed component
+// that can send requests to scheduler to evaluate a rule group
+service SchedulerForRuler {
+  rpc Enqueue(stream ScheduleEvaluationRequest) returns (stream ScheduleEvaluationResponse) {};
 }
 
-message PromQLInstantQueryRequest {
-  string qs = 1;
-  google.protobuf.Timestamp ts = 6  [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+enum RulerToSchedulerType {
+  INIT = 0;
+  ENQUEUE = 1;
+  CANCEL = 2;
 }
 
-message PromQLInstantQueryResult {
-  repeated Sample vector = 1 [(gogoproto.nullable) = false, (gogoproto.customtype) = "SampleAdapter"];
+message ScheduleEvaluationRequest {
+  RulerToSchedulerType type = 1;
+  string userID = 2;
+  string namespace = 3;
+  string ruleGroup = 4;
+  google.protobuf.Timestamp evalTimestamp = 5 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
 }
 
-message Sample {
-  int64 T = 1;
-  double F = 2;
-  repeated cortexpb.LabelPair metric = 4 [(gogoproto.nullable) = false, (gogoproto.customtype) = "github.com/cortexproject/cortex/pkg/cortexpb.LabelAdapter"];
+enum ScheduleEvaluationResponseStatus {
+  OK = 0;
+  TOO_MANY_REQUESTS_PER_TENANT = 1;
+  ERROR = 2;
+  SHUTTING_DOWN = 3;
+}
+
+message ScheduleEvaluationResponse {
+  ScheduleEvaluationResponseStatus status = 1;
+  string error = 2;
 }

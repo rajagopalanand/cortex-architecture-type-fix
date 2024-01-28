@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/cortexproject/cortex/pkg/ruler/scheduler"
 	"hash/fnv"
 	"net/http"
 	"net/url"
@@ -132,8 +133,9 @@ type Config struct {
 
 	RingCheckPeriod time.Duration `yaml:"-"`
 
-	EnableQueryStats      bool `yaml:"query_stats_enabled"`
-	DisableRuleGroupLabel bool `yaml:"disable_rule_group_label"`
+	EnableQueryStats      bool             `yaml:"query_stats_enabled"`
+	DisableRuleGroupLabel bool             `yaml:"disable_rule_group_label"`
+	Scheduler             scheduler.Config `yaml:"scheduler"`
 }
 
 // Validate config and returns error on failure
@@ -261,26 +263,42 @@ type Ruler struct {
 
 	allowedTenants *util.AllowedTenants
 
-	registry prometheus.Registerer
-	logger   log.Logger
+	registry         prometheus.Registerer
+	logger           log.Logger
+	requestCh        chan *scheduler.RuleSchedulerRequest
+	schedulerWorkers *scheduler.RulerSchedulerWorkers
 }
 
 // NewRuler creates a new ruler from a distributor and chunk store.
-func NewRuler(cfg Config, manager MultiTenantManager, reg prometheus.Registerer, logger log.Logger, ruleStore rulestore.RuleStore, limits RulesLimits) (*Ruler, error) {
-	return newRuler(cfg, manager, reg, logger, ruleStore, limits, newRulerClientPool(cfg.ClientTLSConfig, logger, reg))
+func NewRuler(cfg Config, manager MultiTenantManager, reg prometheus.Registerer, logger log.Logger, ruleStore rulestore.RuleStore, limits RulesLimits, grpcListenPort int, requestCh chan *scheduler.RuleSchedulerRequest) (*Ruler, error) {
+	return newRuler(cfg, manager, reg, logger, ruleStore, limits, newRulerClientPool(cfg.ClientTLSConfig, logger, reg), grpcListenPort, requestCh)
 }
 
-func newRuler(cfg Config, manager MultiTenantManager, reg prometheus.Registerer, logger log.Logger, ruleStore rulestore.RuleStore, limits RulesLimits, clientPool ClientsPool) (*Ruler, error) {
+func newRuler(cfg Config, manager MultiTenantManager, reg prometheus.Registerer, logger log.Logger, ruleStore rulestore.RuleStore, limits RulesLimits, clientPool ClientsPool, grpcListenPort int, requestCh chan *scheduler.RuleSchedulerRequest) (*Ruler, error) {
+	//requestCh := make(chan *scheduler.RuleSchedulerRequest)
+	addr, err := util.GetFirstAddressOf(cfg.Ring.InstanceInterfaceNames)
+	if err != nil {
+		level.Error(logger).Log("Unable to get IP address of ruler ", err, err.Error())
+		return nil, err
+	}
+	cfg.Scheduler.Addr = addr
+	cfg.Scheduler.Port = grpcListenPort
+	schedulerWorkers, err := scheduler.NewRulerSchedulerWorkers(cfg.Scheduler, fmt.Sprintf("%s:%d", cfg.Scheduler.Addr, cfg.Scheduler.Port), requestCh, logger)
+	if err != nil {
+		level.Error(logger).Log("msg", "unable to create scheduler workers", "err", err.Error())
+		return nil, err
+	}
 	ruler := &Ruler{
-		cfg:            cfg,
-		store:          ruleStore,
-		manager:        manager,
-		registry:       reg,
-		logger:         logger,
-		limits:         limits,
-		clientsPool:    clientPool,
-		allowedTenants: util.NewAllowedTenants(cfg.EnabledTenants, cfg.DisabledTenants),
-
+		cfg:              cfg,
+		store:            ruleStore,
+		manager:          manager,
+		registry:         reg,
+		logger:           logger,
+		limits:           limits,
+		clientsPool:      clientPool,
+		allowedTenants:   util.NewAllowedTenants(cfg.EnabledTenants, cfg.DisabledTenants),
+		requestCh:        requestCh,
+		schedulerWorkers: schedulerWorkers,
 		ringCheckErrors: promauto.With(reg).NewCounter(prometheus.CounterOpts{
 			Name: "cortex_ruler_ring_check_errors_total",
 			Help: "Number of errors that have occurred when checking the ring for ownership",
@@ -360,7 +378,7 @@ func (r *Ruler) starting(ctx context.Context) error {
 	if r.cfg.EnableSharding {
 		var err error
 
-		if r.subservices, err = services.NewManager(r.lifecycler, r.ring, r.clientsPool); err != nil {
+		if r.subservices, err = services.NewManager(r.lifecycler, r.ring, r.clientsPool, r.schedulerWorkers); err != nil {
 			return errors.Wrap(err, "unable to start ruler subservices")
 		}
 
@@ -621,6 +639,7 @@ func (r *Ruler) listRulesShardingDefault(ctx context.Context) (map[string]rulesp
 	filteredConfigs := make(map[string]rulespb.RuleGroupList)
 	for userID, groups := range configs {
 		filtered := filterRuleGroups(userID, groups, r.limits.DisabledRuleGroups(userID), r.ring, r.lifecycler.GetInstanceAddr(), r.logger, r.ringCheckErrors)
+
 		if len(filtered) > 0 {
 			filteredConfigs[userID] = filtered
 		}

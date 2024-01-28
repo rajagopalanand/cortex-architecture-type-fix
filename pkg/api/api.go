@@ -308,7 +308,9 @@ func (a *API) RegisterTenantDeletion(api *purger.TenantDeletionAPI) {
 }
 
 func (a *API) RegisterRulerScheduler(r *rulerqueryscheduler.RulerScheduler) {
-	rulerqueryscheduler.RegisterRulerSchedulerServer(a.server.GRPC, r)
+	a.indexPage.AddLink(SectionAdminEndpoints, "/ruler-scheduler/ring", "Ruler Ring Status")
+	a.RegisterRoute("/ruler-scheduler/ring", r, false, "GET", "POST")
+	rulerqueryscheduler.RegisterSchedulerForRulerServer(a.server.GRPC, r)
 }
 
 // RegisterRuler registers routes associated with the Ruler service.

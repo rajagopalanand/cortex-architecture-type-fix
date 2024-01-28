@@ -47,6 +47,7 @@ import (
 	"github.com/cortexproject/cortex/pkg/ring/kv/codec"
 	"github.com/cortexproject/cortex/pkg/ring/kv/memberlist"
 	"github.com/cortexproject/cortex/pkg/ruler"
+	rulerscheduler "github.com/cortexproject/cortex/pkg/ruler/scheduler"
 	"github.com/cortexproject/cortex/pkg/scheduler"
 	"github.com/cortexproject/cortex/pkg/storage/bucket"
 	"github.com/cortexproject/cortex/pkg/storegateway"
@@ -544,7 +545,10 @@ func createActiveQueryTracker(cfg querier.Config, logger log.Logger) promql.Quer
 }
 
 func (t *Cortex) initRulerScheduler() (serv services.Service, err error) {
-	t.RulerScheduler, err = rulerqueryscheduler.NewRulerScheduler(util_log.Logger)
+	t.Cfg.RulerQueryScheduler.Ring.ListenPort = t.Cfg.Server.GRPCListenPort
+	reg := prometheus.WrapRegistererWith(prometheus.Labels{"engine": "ruler-scheduler"}, prometheus.DefaultRegisterer)
+
+	t.RulerScheduler, err = rulerqueryscheduler.NewRulerScheduler(t.Cfg.RulerQueryScheduler, reg, util_log.Logger)
 	if err != nil {
 		return
 	}
@@ -563,6 +567,7 @@ func (t *Cortex) initRuler() (serv services.Service, err error) {
 	}
 
 	t.Cfg.Ruler.Ring.ListenPort = t.Cfg.Server.GRPCListenPort
+	requestCh := make(chan *rulerscheduler.RuleSchedulerRequest)
 
 	if t.Cfg.ExternalPusher != nil && t.Cfg.ExternalQueryable != nil {
 		rulerRegisterer := prometheus.WrapRegistererWith(prometheus.Labels{"engine": "ruler"}, prometheus.DefaultRegisterer)
@@ -592,14 +597,14 @@ func (t *Cortex) initRuler() (serv services.Service, err error) {
 		}
 		schedulerPool := rulerqueryscheduler.NewRulerSchedulerClientPool(t.Cfg.Ruler.ClientTLSConfig, util_log.Logger, prometheus.DefaultRegisterer)
 		managerFactory := ruler.DefaultTenantManagerFactory(t.Cfg.Ruler, t.Cfg.ExternalPusher, t.Cfg.ExternalQueryable, queryEngine, t.Overrides, prometheus.DefaultRegisterer, schedulerPool)
-		manager, err = ruler.NewDefaultMultiTenantManager(t.Cfg.Ruler, managerFactory, prometheus.DefaultRegisterer, util_log.Logger)
+		manager, err = ruler.NewDefaultMultiTenantManager(t.Cfg.Ruler, managerFactory, prometheus.DefaultRegisterer, util_log.Logger, requestCh)
 	} else {
 		rulerRegisterer := prometheus.WrapRegistererWith(prometheus.Labels{"engine": "ruler"}, prometheus.DefaultRegisterer)
 		// TODO: Consider wrapping logger to differentiate from querier module logger
 		queryable, _, engine := querier.New(t.Cfg.Querier, t.Overrides, t.Distributor, t.StoreQueryables, rulerRegisterer, util_log.Logger)
 		schedulerPool := rulerqueryscheduler.NewRulerSchedulerClientPool(t.Cfg.Ruler.ClientTLSConfig, util_log.Logger, prometheus.DefaultRegisterer)
 		managerFactory := ruler.DefaultTenantManagerFactory(t.Cfg.Ruler, t.Distributor, queryable, engine, t.Overrides, prometheus.DefaultRegisterer, schedulerPool)
-		manager, err = ruler.NewDefaultMultiTenantManager(t.Cfg.Ruler, managerFactory, prometheus.DefaultRegisterer, util_log.Logger)
+		manager, err = ruler.NewDefaultMultiTenantManager(t.Cfg.Ruler, managerFactory, prometheus.DefaultRegisterer, util_log.Logger, requestCh)
 	}
 
 	if err != nil {
@@ -613,6 +618,8 @@ func (t *Cortex) initRuler() (serv services.Service, err error) {
 		util_log.Logger,
 		t.RulerStorage,
 		t.Overrides,
+		t.Cfg.Server.GRPCListenPort,
+		requestCh,
 	)
 	if err != nil {
 		return
@@ -792,6 +799,7 @@ func (t *Cortex) setupModuleManager() error {
 		QueryFrontend:            {QueryFrontendTripperware},
 		QueryScheduler:           {API, Overrides},
 		Ruler:                    {DistributorService, Overrides, StoreQueryable, RulerStorage},
+		RulerScheduler:           {API},
 		RulerStorage:             {Overrides},
 		Configs:                  {API},
 		AlertManager:             {API, MemberlistKV, Overrides},

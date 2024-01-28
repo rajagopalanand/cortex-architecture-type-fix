@@ -3,6 +3,7 @@ package ruler
 import (
 	"context"
 	"fmt"
+	"github.com/cortexproject/cortex/pkg/ruler/scheduler"
 	"net/http"
 	"sync"
 	"time"
@@ -46,9 +47,10 @@ type DefaultMultiTenantManager struct {
 	configUpdatesTotal            *prometheus.CounterVec
 	registry                      prometheus.Registerer
 	logger                        log.Logger
+	requestCh                     chan *scheduler.RuleSchedulerRequest
 }
 
-func NewDefaultMultiTenantManager(cfg Config, managerFactory ManagerFactory, reg prometheus.Registerer, logger log.Logger) (*DefaultMultiTenantManager, error) {
+func NewDefaultMultiTenantManager(cfg Config, managerFactory ManagerFactory, reg prometheus.Registerer, logger log.Logger, requestCh chan *scheduler.RuleSchedulerRequest) (*DefaultMultiTenantManager, error) {
 	ncfg, err := buildNotifierConfig(&cfg)
 	if err != nil {
 		return nil, err
@@ -67,6 +69,7 @@ func NewDefaultMultiTenantManager(cfg Config, managerFactory ManagerFactory, reg
 		mapper:             newMapper(cfg.RulePath, logger),
 		userManagers:       map[string]RulesManager{},
 		userManagerMetrics: userManagerMetrics,
+		requestCh:          requestCh,
 		managersTotal: promauto.With(reg).NewGauge(prometheus.GaugeOpts{
 			Namespace: "cortex",
 			Name:      "ruler_managers_total",
@@ -151,7 +154,7 @@ func (r *DefaultMultiTenantManager) syncRulesToManager(ctx context.Context, user
 			r.userManagers[user] = manager
 		}
 
-		err = manager.Update(r.cfg.EvaluationInterval, files, r.cfg.ExternalLabels, r.cfg.ExternalURL.String(), ruleGroupIterationFunc)
+		err = manager.Update(r.cfg.EvaluationInterval, files, r.cfg.ExternalLabels, r.cfg.ExternalURL.String(), r.ruleGroupIterationFunc)
 		if err != nil {
 			r.lastReloadSuccessful.WithLabelValues(user).Set(0)
 			level.Error(r.logger).Log("msg", "unable to update rule manager", "user", user, "err", err)
@@ -163,7 +166,18 @@ func (r *DefaultMultiTenantManager) syncRulesToManager(ctx context.Context, user
 	}
 }
 
-func ruleGroupIterationFunc(ctx context.Context, g *promRules.Group, evalTimestamp time.Time) {
+func (r *DefaultMultiTenantManager) ruleGroupIterationFunc(ctx context.Context, g *promRules.Group, evalTimestamp time.Time) {
+	userID, err := user.ExtractUserID(ctx)
+	if err != nil {
+		level.Info(g.Logger()).Log("msg", "unable to extract user ID", err, err.Error())
+	}
+	level.Info(g.Logger()).Log("msg", "enqueuing rule group", "rule_group", g.Name(), "namespace", g.File())
+	r.requestCh <- &scheduler.RuleSchedulerRequest{
+		UserID:        userID,
+		Namespace:     g.File(),
+		Rulegroup:     g.Name(),
+		EvalTimestamp: evalTimestamp,
+	}
 	logMessage := []interface{}{
 		"msg", "evaluating rule group",
 		"component", "ruler",

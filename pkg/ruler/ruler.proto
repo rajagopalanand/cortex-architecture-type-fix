@@ -17,7 +17,18 @@ option (gogoproto.unmarshaler_all) = true;
 
 service Ruler {
   rpc Rules(RulesRequest) returns (RulesResponse) {};
+//  rpc Execute(RuleGroup) returns (RuleGroup) {};
 }
+
+//message RuleGroup {
+//  string name = 1;
+//  string file = 2;
+//  google.protobuf.Duration evaluationTime = 3;
+//  google.protobuf.Timestamp lastEvaluation = 4;
+//  google.protobuf.Timestamp lastEvalTimestamp = 5;
+//
+//}
+
 
 message RulesRequest {
   repeated string ruleNames = 1;
